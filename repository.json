@@ -1,17 +1,6 @@
+
 {
-  "name": "My Custom Add-ons",
+  "name": "My Custom Home Assistant Add-ons",
   "url": "https://github.com/robinhood1596/CustomAdd-on/",
-  "maintainer": "Your Name <your.email@example.com>",
-  "addons": [
-    {
-      "name": "Unbound DNS Resolver",
-      "slug": "unbound",
-      "description": "A secure, validating, recursive DNS resolver for Home Assistant.",
-      "url": "https://github.com/robinhood1596/CustomAdd-on/tree/main/unboundHAOS",
-      "version": "0.1.0",
-      "auto_update": false,
-      "arch": ["aarch64", "amd64", "armhf", "armv7", "i386"],
-      "image": "klutchell/unbound:{arch}" // Or your own image if you're building it
-    }
-  ]
+  "maintainer": "Ich selbst>"
 }
