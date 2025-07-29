@@ -1,20 +1,19 @@
+# Stage 1: Build Environment - Use alpinelinux/unbound as base to install HA components
 ARG BUILD_ARCH
-FROM mvance/unbound:latest
+FROM alpinelinux/unbound:latest AS build_env
 
-# Install necessary tools: curl, ca-certificates, xz-utils, tar, and bash.
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils tar bash && rm -rf /var/lib/apt/lists/*
+# Ensure necessary tools are available for downloads and package management.
+# alpinelinux/unbound is Alpine-based, so apk is the package manager.
+# curl, bash, xz, tar are needed for bashio/S6-Overlay setup.
+RUN apk update && apk add --no-cache curl bash xz tar && rm -rf /var/cache/apk/*
 
-# Download and install bashio
+# --- Download and install bashio ---
 ARG BASHIO_VERSION=2024.08.0
 RUN curl -sL https://github.com/home-assistant/bashio/releases/download/${BASHIO_VERSION}/bashio \
     -o /usr/bin/bashio \
     && chmod a+x /usr/bin/bashio
 
-# Copy your run.sh script into the container and make it executable
-COPY run.sh /usr/bin/run.sh
-RUN chmod a+x /usr/bin/run.sh
-
-# Install S6-Overlay (required for Home Assistant Add-ons) - Rely on /init directly
+# --- Install S6-Overlay (required for Home Assistant Add-ons) ---
 ARG S6_OVERLAY_VERSION=3.1.6.2
 
 # Handle potential BUILD_ARCH to S6-Overlay arch mapping
@@ -39,19 +38,23 @@ RUN S6_ARCH="${BUILD_ARCH}"; \
     echo "Cleaning up S6-Overlay downloads..."; \
     rm /tmp/s6-overlay-noarch.tar.xz /tmp/s6-overlay-arch.tar.xz
 
-# Set a basic PATH (as a safeguard) - might not be needed but harmless
+
+# Stage 2: Final Add-on Image - Build on the now S6-Overlay/bashio-enabled image
+FROM build_env
+
+# Set a basic PATH (as a safeguard)
 ENV PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-# --- S6 Service Definition for your run.sh script ---
+# --- Copy your run.sh script and define S6 service ---
 # Create the service directory
 RUN mkdir -p /etc/services.d/unbound-starter
 
-# Copy the run script for the S6 service
+# Copy the run.sh script to be the S6 service run script
 COPY run.sh /etc/services.d/unbound-starter/run
 RUN chmod a+x /etc/services.d/unbound-starter/run
 
 # Set the ENTRYPOINT to S6-Overlay's init system
-ENTRYPOINT ["/init"] # This is the standard S6-Overlay entrypoint
+ENTRYPOINT ["/init"]
 CMD [] # CMD is empty, as S6 will manage services
 
 # Expose ports as declared in config.json
