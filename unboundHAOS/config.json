@@ -1,9 +1,9 @@
 {
-  "name": "Unbound DNS Resolver (mvance)",
+  "name": "Unbound DNS Resolver (AlpineLinux)",
   "version": "0.1.0",
-  "slug": "unbound_mvance",
-  "description": "A secure, validating, recursive DNS resolver for Home Assistant, using mvance/unbound.",
-  "url": "https://github.com/YOUR_GITHUB_USERNAME/YOUR_REPO_NAME/tree/main/unbound_mvance",
+  "slug": "unbound_alpine",
+  "description": "A secure, validating, recursive DNS resolver for Home Assistant, using alpinelinux/unbound.",
+  "url": "https://github.com/robinhood1596/CustomAdd-on/tree/main/unboundHAOS",
   "startup": "services",
   "init": false,
   "host_network": true,
