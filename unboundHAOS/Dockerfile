@@ -14,7 +14,7 @@ RUN curl -sL https://github.com/home-assistant/bashio/releases/download/${BASHIO
 COPY run.sh /usr/bin/run.sh
 RUN chmod a+x /usr/bin/run.sh
 
-# Install S6-Overlay (required for Home Assistant Add-ons) - More Robust Method
+# Install S6-Overlay (required for Home Assistant Add-ons) - Robust Method
 ARG S6_OVERLAY_VERSION=3.1.6.2
 
 # Handle potential BUILD_ARCH to S6-Overlay arch mapping
@@ -41,18 +41,30 @@ RUN S6_ARCH="${BUILD_ARCH}"; \
     ln -s /usr/local/s6-overlay/bin/s6-overlay-init /usr/bin/init; \
     ln -s /usr/local/s6-overlay/bin/s6-overlay-suexec /usr/bin/s6-overlay-suexec; \
     ln -s /usr/local/s6-overlay/bin/s6-setuidgid /usr/bin/s6-setuidgid; \
-    # You might need to add more symlinks if other S6 tools are not found.
-    # For now, let's just make sure the essential init and suexec are there.
     \
     echo "Cleaning up S6-Overlay downloads..."; \
     rm /tmp/s6-overlay-noarch.tar.xz /tmp/s6-overlay-arch.tar.xz
 
-# Set a basic PATH (should be covered by S6 init, but as a safeguard)
+# Set a basic PATH (as a safeguard)
 ENV PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
+# --- S6 Service Definition for your run.sh script ---
+# Create the service directory
+RUN mkdir -p /etc/services.d/unbound-starter
+
+# Create the run script for the S6 service
+# This script will be executed by S6 when the container starts
+COPY run.sh /etc/services.d/unbound-starter/run
+RUN chmod a+x /etc/services.d/unbound-starter/run
+
+# Remove the original run.sh from /usr/bin/ as it's not the direct entrypoint anymore
+# Not strictly necessary if CMD is properly handled, but good for clarity.
+# If `run.sh` contains the `exec unbound` at the end, that will become the primary process of this service.
+
+
 # Set the ENTRYPOINT to S6-Overlay's init system
-ENTRYPOINT ["/usr/bin/init"] # Explicitly use the symlink we created
-CMD ["/usr/bin/bashio", "/usr/bin/run.sh"]
+ENTRYPOINT ["/usr/bin/init"]
+CMD [] # CMD is empty, as S6 will manage services
 
 # Expose ports as declared in config.json
 EXPOSE 54/tcp 54/udp
