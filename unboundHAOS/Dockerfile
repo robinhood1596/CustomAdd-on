@@ -1,6 +1,8 @@
 # Use mvance/unbound as the base image, it already contains Unbound and a shell.
+# We still need BUILD_ARCH because it's required by S6-Overlay download later.
 ARG BUILD_ARCH
-FROM mvance/unbound:${BUILD_ARCH}
+# *** CRITICAL CHANGE HERE: Use 'latest' instead of '${BUILD_ARCH}' ***
+FROM mvance/unbound:latest
 
 # Install necessary tools for this stage (curl) if not present in mvance/unbound
 # mvance/unbound is Alpine-based, so apk add is correct.
