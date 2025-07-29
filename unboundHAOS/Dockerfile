@@ -5,7 +5,15 @@ FROM alpinelinux/unbound:latest AS build_env
 # Ensure necessary tools are available for downloads and package management.
 # alpinelinux/unbound is Alpine-based, so apk is the package manager.
 # curl, bash, xz, tar are needed for bashio/S6-Overlay setup.
-RUN apk update && apk add --no-cache curl bash xz tar && rm -rf /var/cache/apk/*
+RUN apk update && apk add --no-cache \
+    curl \
+    bash \
+    xz \
+    tar \
+    s6 \           # Add s6 package
+    execline \     # Add execline package
+    s6-portable-utils \ # Often useful with s6
+    && rm -rf /var/cache/apk/*
 
 # --- Download and install bashio ---
 ARG BASHIO_VERSION=2024.08.0
