@@ -5,8 +5,7 @@ FROM alpinelinux/unbound:latest AS build_env
 # Ensure necessary tools are available for downloads and package management.
 # alpinelinux/unbound is Alpine-based, so apk is the package manager.
 # curl, bash, xz, tar are needed for bashio/S6-Overlay setup.
-RUN apk update && apk add --no-cache curl bash xz tar s6 execline s6-portable-utils \
-    && rm -rf /var/cache/apk/*
+RUN apk update && apk add --no-cache curl bash xz tar s6 execline s6-portable-utils && rm -rf /var/cache/apk/*
 
 # --- Download and install bashio ---
 ARG BASHIO_VERSION=2024.08.0
@@ -32,18 +31,23 @@ RUN S6_ARCH="${BUILD_ARCH}"; \
     curl -sSL https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${S6_ARCH}.tar.xz \
     -o /tmp/s6-overlay-arch.tar.xz; \
     \
-    echo "Extracting S6-Overlay..."; \
-    tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz \
-    && tar -C / -Jxpf /tmp/s6-overlay-arch.tar.xz; \
+    echo "Extracting S6-Overlay (noarch to /, arch-specific to /usr)..."; \
+    # Extract architecture-independent files (like /init) to the root
+    tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz; \
+    # Extract architecture-specific binaries (like s6-overlay-suexec) to /usr
+    tar -C /usr -Jxpf /tmp/s6-overlay-arch.tar.xz; \
+    \
+    echo "Verifying s6-overlay-suexec existence and permissions..."; \
+    ls -l /usr/bin/s6-overlay-suexec || echo "WARNING: s6-overlay-suexec not found at /usr/bin!"; \
+    ls -l /command/s6-overlay-suexec || echo "WARNING: s6-overlay-suexec not found at /command!"; \
     \
     echo "Cleaning up S6-Overlay downloads..."; \
     rm /tmp/s6-overlay-noarch.tar.xz /tmp/s6-overlay-arch.tar.xz
 
-
 # Stage 2: Final Add-on Image - Build on the now S6-Overlay/bashio-enabled image
 FROM build_env
 
-# Set a basic PATH (as a safeguard)
+# Set a basic PATH (as a safeguard) - /usr/bin should now contain s6-overlay-suexec
 ENV PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 # --- Copy your run.sh script and define S6 service ---
@@ -51,12 +55,3 @@ ENV PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 RUN mkdir -p /etc/services.d/unbound-starter
 
 # Copy the run.sh script to be the S6 service run script
-COPY run.sh /etc/services.d/unbound-starter/run
-RUN chmod a+x /etc/services.d/unbound-starter/run
-
-# Set the ENTRYPOINT to S6-Overlay's init system
-ENTRYPOINT ["/init"]
-CMD [] # CMD is empty, as S6 will manage services
-
-# Expose ports as declared in config.json
-EXPOSE 54/tcp 54/udp
