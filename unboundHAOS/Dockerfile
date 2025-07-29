@@ -19,16 +19,15 @@ RUN chmod a+x /usr/bin/run.sh
 ARG BUILD_ARCH
 FROM klutchell/unbound:latest
 
-# IMPORTANT: Set the default shell for RUN commands in this stage to /bin/ash
-# as klutchell/unbound does not have /bin/sh or /bin/bash directly.
-SHELL ["/bin/ash", "-c"] # Use ASH, common in minimalist images based on Alpine
+# IMPORTANT: Do NOT use a global SHELL instruction for this stage.
+# Instead, explicitly call /bin/ash for each RUN command that needs it.
 
 # Install S6-Overlay (required for Home Assistant Add-ons)
 ARG S6_OVERLAY_VERSION=3.1.6.2
-RUN curl -sSL https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${BUILD_ARCH}.tar.xz \
+RUN /bin/ash -c "curl -sSL https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${BUILD_ARCH}.tar.xz \
     -o /tmp/s6-overlay.tar.xz \
     && tar -C / -Jxpf /tmp/s6-overlay.tar.xz \
-    && rm /tmp/s6-overlay.tar.xz
+    && rm /tmp/s6-overlay.tar.xz"
 
 # Copy bashio from the build_stage
 COPY --from=build_stage /usr/bin/bashio /usr/bin/bashio
