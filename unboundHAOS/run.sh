@@ -7,14 +7,34 @@ set -e
 bashio::log.info "Starting Unbound Add-on (AlpineLinux)..."
 
 # --- Define Paths ---
-# Standard Alpine paths: binaries in /usr/sbin, config in /etc/unbound
 UNBOUND_CONFIG_DIR="/etc/unbound"
-UNBOUND_BIN_DIR="/usr/sbin" # Common path for unbound/unbound-anchor on Alpine
-UNBOUND_ROOT_KEY_PATH="${UNBOUND_CONFIG_DIR}/root.key" # Common path for root.key
+UNBOUND_BIN_DIR="/usr/sbin"
+UNBOUND_ROOT_KEY_PATH="${UNBOUND_CONFIG_DIR}/root.key"
 
-# Create config.d directory if needed (Unbound often auto-includes this)
+# Create config.d directory if needed
 UNBOUND_CONF_D_DIR="${UNBOUND_CONFIG_DIR}/unbound.conf.d"
 mkdir -p "${UNBOUND_CONF_D_DIR}" || bashio::log.fatal "Failed to create config directory: ${UNBOUND_CONF_D_DIR}"
+
+# --- Ensure the main unbound.conf file exists and includes the .d directory ---
+UNBOUND_MAIN_CONFIG="${UNBOUND_CONFIG_DIR}/unbound.conf"
+if [ ! -f "${UNBOUND_MAIN_CONFIG}" ]; then
+    bashio::log.info "Main unbound.conf not found. Creating a minimal one."
+    cat > "${UNBOUND_MAIN_CONFIG}" <<EOF
+# Main Unbound configuration file for Home Assistant Add-on
+# This file includes dynamically generated configuration snippets.
+
+server:
+    # Set default directory for other files
+    directory: "${UNBOUND_CONFIG_DIR}"
+
+include: "${UNBOUND_CONF_D_DIR}/port.conf"
+include: "${UNBOUND_CONF_D_DIR}/access-control.conf"
+# You might want to include a wildcard if you plan more files
+# include: "${UNBOUND_CONF_D_DIR}/*.conf"
+EOF
+    chmod 644 "${UNBOUND_MAIN_CONFIG}"
+    bashio::log.info "Minimal unbound.conf created at ${UNBOUND_MAIN_CONFIG}"
+fi
 
 # --- Read configuration options from config.json ---
 UNBOUND_PORT=$(bashio::config 'listen_port')
@@ -33,12 +53,8 @@ server:
     do-udp: yes
     do-tcp: yes
     verbosity: ${UNBOUND_VERBOSITY}
-    # Unbound typically loads root.key via auto-trust-anchor-file
     auto-trust-anchor-file: "${UNBOUND_ROOT_KEY_PATH}"
-    # Default module config for validating resolver
     module-config: "validator iterator"
-    # log-time-ascii: yes
-    # log-queries: yes
 EOF
 
 # Create access control file
@@ -55,11 +71,8 @@ bashio::log.info "Access-control rules added."
 
 # --- Handle root.key for DNSSEC ---
 bashio::log.info "Handling root.key for DNSSEC..."
-# Ensure the directory for root.key exists
 mkdir -p "$(dirname "${UNBOUND_ROOT_KEY_PATH}")"
 
-# Use unbound-anchor to fetch/update the root trust anchor
-# It should be in /usr/sbin/ on Alpine-based images.
 if [ ! -f "${UNBOUND_ROOT_KEY_PATH}" ]; then
     bashio::log.info "Root key not found. Attempting initial setup with unbound-anchor."
     "${UNBOUND_BIN_DIR}/unbound-anchor" -a "${UNBOUND_ROOT_KEY_PATH}" || \
@@ -74,6 +87,4 @@ chmod 644 "${UNBOUND_ROOT_KEY_PATH}"
 bashio::log.info "Permissions set for root.key."
 
 bashio::log.info "Unbound configuration prepared. Starting Unbound daemon..."
-# Unbound from Alpine packages typically uses /etc/unbound/unbound.conf
-# which then includes /etc/unbound/unbound.conf.d/
-exec "${UNBOUND_BIN_DIR}/unbound" -c "${UNBOUND_CONFIG_DIR}/unbound.conf" -dv
+exec "${UNBOUND_BIN_DIR}/unbound" -c "${UNBOUND_MAIN_CONFIG}" -dv
