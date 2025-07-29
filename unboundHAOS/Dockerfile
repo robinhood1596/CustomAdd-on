@@ -1,16 +1,19 @@
-ARG BUILD_ARCH
+# Stage 1: Build Stage - Use a base image with a shell to prepare files
+FROM alpine:latest AS build_stage
 
-FROM klutchell/unbound:latest
-
-# Set the default shell for subsequent RUN commands
-# This is crucial for Alpine-based images where /bin/sh might not be present or linked as expected.
-SHELL ["/bin/bash", "-c"]
-
-# Copy the run.sh script into the container
+# Copy your run.sh script into the build stage
 COPY run.sh /usr/bin/run.sh
 
-# Ensure the script is executable
+# Ensure the script is executable in this stage
 RUN chmod a+x /usr/bin/run.sh
+
+
+# Stage 2: Final Image Stage - Use the minimalist klutchell/unbound image
+ARG BUILD_ARCH
+FROM klutchell/unbound:latest
+
+# Copy the prepared (executable) run.sh from the build_stage
+COPY --from=build_stage /usr/bin/run.sh /usr/bin/run.sh
 
 # Set the entrypoint to your run.sh script
 CMD [ "/usr/bin/run.sh" ]
