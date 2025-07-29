@@ -1,9 +1,8 @@
 ARG BUILD_ARCH
 FROM mvance/unbound:latest
 
-# Install necessary tools for bashio (curl, if not present already).
-# mvance/unbound is likely Debian/Ubuntu based, so it uses apt.
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && rm -rf /var/lib/apt/lists/*
+# Install necessary tools: curl for downloading, ca-certificates for HTTPS, and xz-utils for .xz decompression.
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils && rm -rf /var/lib/apt/lists/*
 
 # Download and install bashio
 ARG BASHIO_VERSION=2024.08.0
