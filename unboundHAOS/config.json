@@ -1,21 +1,21 @@
 {
   "name": "Unbound DNS Resolver",
-  "version": "0.1.0", # Start with a version, increment for updates
-  "slug": "unbound",  # Unique identifier for the add-on within your repo
+  "version": "0.1.0",
+  "slug": "unbound",
   "description": "A secure, validating, recursive DNS resolver for Home Assistant.",
   "url": "https://github.com/robinhood1596/CustomAdd-on/tree/main/unboundHAOS",
-  "startup": "services", # Start when Supervisor starts services
-  "init": false,         # Do not use S6 init, run.sh will directly control process
-  "host_network": true,  # Essential for a DNS server
+  "startup": "services",
+  "init": false,
+  "host_network": true,
   "ports": {
-    "53/tcp": null,      # Explicitly declare ports to expose on the host
-    "53/udp": null       # null means supervisor maps to default, which is 53
+    "54/tcp": null,
+    "54/udp": null
   },
   "ports_description": {
-    "53/tcp": "Unbound DNS TCP port (for zone transfers, etc.)",
-    "53/udp": "Unbound DNS UDP port (main query port)"
+    "54/tcp": "Unbound DNS TCP port (for zone transfers, etc.)",
+    "54/udp": "Unbound DNS UDP port (main query port)"
   },
-  "arch": [              # Architectures this add-on supports
+  "arch": [
     "aarch64",
     "amd64",
     "armhf",
@@ -23,18 +23,14 @@
     "i386"
   ],
   "options": {
-    "listen_port": 55,
+    "listen_port": 54,
     "verbosity": 1,
     "access_control_ips": ["192.168.178.0/24", "172.16.0.0/12", "10.0.0.0/8"]
   },
   "schema": {
     "listen_port": "int(1,65535)",
     "verbosity": "int(0,5)",
-    "access_control_ips": ["str"] # Array of strings for IP ranges
+    "access_control_ips": ["str"]
   },
   "image": "klutchell/unbound:{arch}"
-  // NOTE: This assumes you'll build your own image. If you want to use klutchell/unbound directly:
-  // "image": "klutchell/unbound:{arch}"
-  // OR "image": "mvance/unbound:{arch}"
-  // If using existing image, omit Dockerfile below.
 }
