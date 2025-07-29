@@ -19,31 +19,40 @@ RUN chmod a+x /usr/bin/run.sh
 ARG S6_OVERLAY_VERSION=3.1.6.2
 
 # Handle potential BUILD_ARCH to S6-Overlay arch mapping
-# Example: Home Assistant's amd64 maps to s6-overlay's x86_64
-# For aarch64, it's typically aarch64.
-# Let's map for common cases:
 RUN S6_ARCH="${BUILD_ARCH}"; \
     if [ "$BUILD_ARCH" = "amd64" ]; then S6_ARCH="x86_64"; fi; \
     if [ "$BUILD_ARCH" = "armv7" ]; then S6_ARCH="arm"; fi; \
     if [ "$BUILD_ARCH" = "aarch64" ]; then S6_ARCH="aarch64"; fi; \
     if [ "$BUILD_ARCH" = "armhf" ]; then S6_ARCH="armhf"; fi; \
     \
-    bashio::log.info "Downloading s6-overlay-noarch.tar.xz..."; \
+    echo "Downloading s6-overlay-noarch.tar.xz..."; \
     curl -sSL https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz \
     -o /tmp/s6-overlay-noarch.tar.xz; \
     \
-    bashio::log.info "Downloading s6-overlay-${S6_ARCH}.tar.xz..."; \
+    echo "Downloading s6-overlay-${S6_ARCH}.tar.xz..."; \
     curl -sSL https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${S6_ARCH}.tar.xz \
     -o /tmp/s6-overlay-arch.tar.xz; \
     \
-    bashio::log.info "Extracting S6-Overlay..."; \
+    echo "Extracting S6-Overlay..."; \
     tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz \
     && tar -C / -Jxpf /tmp/s6-overlay-arch.tar.xz; \
     \
-    bashio::log.info "Cleaning up S6-Overlay downloads..."; \
+    echo "Cleaning up S6-Overlay downloads..."; \
     rm /tmp/s6-overlay-noarch.tar.xz /tmp/s6-overlay-arch.tar.xz
 
-# Set the ENTRYPOINT to S6-Overlay's init system
+# Set the ENTRYPOINT to S6-Overlay's init system explicitly
+# The S6-Overlay's `/init` usually is a symlink or small script that invokes the real init binary,
+# which for v3.x is typically `/bin/s6-svscanctl` or similar for runit/init process management.
+# However, the most reliable way for S6-Overlay is `ENTRYPOINT ["/init"]`
+# coupled with a CMD that runs the services.
+
+# Let's add a debug to confirm if `/init` itself is missing, or if `s6-overlay-suexec` is what's missing later.
+# The error means `/init` *started* but then couldn't find a sub-binary it needed.
+
+# Let's try to set the PATH within the Dockerfile itself explicitly before ENTRYPOINT
+ENV PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# Standard S6-Overlay entrypoint/cmd
 ENTRYPOINT ["/init"]
 CMD ["/usr/bin/bashio", "/usr/bin/run.sh"]
 
