@@ -3,8 +3,7 @@
   "version": "0.1.0",
   "slug": "unbound",
   "description": "A secure, validating, recursive DNS resolver for Home Assistant.",
-  "url": "https://github.com/robinhood1596/CustomAdd-on/tree/main/unboundHAOS",
-  "startup": "services",
+   "startup": "services",
   "init": false,
   "host_network": true,
   "ports": {
@@ -31,6 +30,5 @@
     "listen_port": "int(1,65535)",
     "verbosity": "int(0,5)",
     "access_control_ips": ["str"]
-  },
-  "image": "klutchell/unbound:{arch}"
+  }
 }
