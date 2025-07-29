@@ -15,5 +15,9 @@ FROM klutchell/unbound:latest
 # Copy the prepared (executable) run.sh from the build_stage
 COPY --from=build_stage /usr/bin/run.sh /usr/bin/run.sh
 
-# Set the entrypoint to your run.sh script
-CMD [ "/usr/bin/run.sh" ]
+# Set the entrypoint to be a simple shell, then execute your script with bashio
+# This explicitly ensures the bashio environment is loaded for your script
+ENTRYPOINT ["/usr/bin/with-contenv", "bashio", "/usr/bin/run.sh"]
+
+# CMD is often used with ENTRYPOINT for default arguments, but here run.sh takes care of it
+CMD []
