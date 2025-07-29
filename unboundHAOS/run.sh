@@ -4,13 +4,17 @@
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
-bashio::log.info "Starting Unbound Add-on (mvance)..."
+bashio::log.info "Starting Unbound Add-on (AlpineLinux)..."
 
 # --- Define Paths ---
-# mvance/unbound uses /etc/unbound/unbound.conf and /etc/unbound/unbound.conf.d/
+# Standard Alpine paths: binaries in /usr/sbin, config in /etc/unbound
 UNBOUND_CONFIG_DIR="/etc/unbound"
-UNBOUND_ROOT_KEY_PATH="/etc/unbound/root.key" # mvance/unbound expects root.key here
-UNBOUND_CONF_D_DIR="${UNBOUND_CONFIG_DIR}/unbound.conf.d" # For custom configs
+UNBOUND_BIN_DIR="/usr/sbin" # Common path for unbound/unbound-anchor on Alpine
+UNBOUND_ROOT_KEY_PATH="${UNBOUND_CONFIG_DIR}/root.key" # Common path for root.key
+
+# Create config.d directory if needed (Unbound often auto-includes this)
+UNBOUND_CONF_D_DIR="${UNBOUND_CONFIG_DIR}/unbound.conf.d"
+mkdir -p "${UNBOUND_CONF_D_DIR}" || bashio::log.fatal "Failed to create config directory: ${UNBOUND_CONF_D_DIR}"
 
 # --- Read configuration options from config.json ---
 UNBOUND_PORT=$(bashio::config 'listen_port')
@@ -19,7 +23,6 @@ bashio::log.info "Configured port: ${UNBOUND_PORT}, Verbosity: ${UNBOUND_VERBOSI
 
 # --- Generate dynamic Unbound configuration snippets ---
 bashio::log.info "Generating dynamic Unbound configuration snippets in ${UNBOUND_CONF_D_DIR}"
-mkdir -p "${UNBOUND_CONF_D_DIR}" || bashio::log.fatal "Failed to create config directory: ${UNBOUND_CONF_D_DIR}"
 
 # Create a port and interface config file
 cat > "${UNBOUND_CONF_D_DIR}/port.conf" <<EOF
@@ -30,9 +33,12 @@ server:
     do-udp: yes
     do-tcp: yes
     verbosity: ${UNBOUND_VERBOSITY}
-    # These are defaults in mvance/unbound, but explicit is fine
-    # auto-trust-anchor-file: "${UNBOUND_ROOT_KEY_PATH}"
-    # module-config: "validator iterator"
+    # Unbound typically loads root.key via auto-trust-anchor-file
+    auto-trust-anchor-file: "${UNBOUND_ROOT_KEY_PATH}"
+    # Default module config for validating resolver
+    module-config: "validator iterator"
+    # log-time-ascii: yes
+    # log-queries: yes
 EOF
 
 # Create access control file
@@ -49,56 +55,25 @@ bashio::log.info "Access-control rules added."
 
 # --- Handle root.key for DNSSEC ---
 bashio::log.info "Handling root.key for DNSSEC..."
-# mvance/unbound includes unbound-anchor and it's usually run by its entrypoint.
-# We ensure the root.key is present and updated explicitly if needed.
-# The `mvance/unbound` image's `docker-entrypoint.sh` might already handle this.
-# Let's ensure our `run.sh` doesn't conflict or duplicate.
-# For simplicity, we'll let mvance/unbound's entrypoint manage the initial root.key setup.
-# We'll just ensure the file exists and has permissions if the base image relies on it.
-
-# Ensure the directory for root.key exists (if it's not already by mvance/unbound)
+# Ensure the directory for root.key exists
 mkdir -p "$(dirname "${UNBOUND_ROOT_KEY_PATH}")"
 
-# Run unbound-anchor explicitly if the base image's entrypoint doesn't
-# or if we want to force an update.
-# This assumes /usr/sbin/unbound-anchor is available and in PATH.
-# mvance/unbound usually puts it in /usr/sbin.
+# Use unbound-anchor to fetch/update the root trust anchor
+# It should be in /usr/sbin/ on Alpine-based images.
 if [ ! -f "${UNBOUND_ROOT_KEY_PATH}" ]; then
     bashio::log.info "Root key not found. Attempting initial setup with unbound-anchor."
-    /usr/sbin/unbound-anchor -a "${UNBOUND_ROOT_KEY_PATH}" || \
+    "${UNBOUND_BIN_DIR}/unbound-anchor" -a "${UNBOUND_ROOT_KEY_PATH}" || \
     bashio::log.error "Failed to generate initial root.key with unbound-anchor. DNSSEC might fail."
 else
     bashio::log.info "Root key exists. Updating it with unbound-anchor."
-    /usr/sbin/unbound-anchor -a "${UNBOUND_ROOT_KEY_PATH}" || \
+    "${UNBOUND_BIN_DIR}/unbound-anchor" -a "${UNBOUND_ROOT_KEY_PATH}" || \
     bashio::log.error "Failed to update root.key with unbound-anchor. DNSSEC might fail."
 fi
 
 chmod 644 "${UNBOUND_ROOT_KEY_PATH}"
 bashio::log.info "Permissions set for root.key."
 
-# mvance/unbound expects the unbound daemon to be started by its own entrypoint.
-# We just need to make sure our configuration files are in place.
-bashio::log.info "Unbound configuration prepared. mvance/unbound's entrypoint will start the daemon."
-
-# Since mvance/unbound's entrypoint will eventually run `unbound`,
-# we need to ensure this script doesn't just exit.
-# A common pattern is to make this script the "pre-run" and then let
-# the actual application take over.
-# If /init calls us, and we exit, the container exits.
-# So, we should *not* `exec` unbound directly here.
-# Instead, we rely on the mvance/unbound image's own entrypoint to run unbound
-# after our configuration snippets are placed.
-
-# The /init (s6-overlay) entrypoint runs /usr/bin/bashio /usr/bin/run.sh.
-# Once run.sh completes, if nothing else keeps the container alive, it exits.
-# We need to tell s6-overlay to run unbound as its main service.
-
-# This implies we need an s6 service file.
-
-# Instead of relying on mvance/unbound's *internal* entrypoint for unbound,
-# which might be complex, let's just directly launch unbound from our script,
-# leveraging the fact that mvance/unbound has all the binaries and dependencies.
-bashio::log.info "Starting Unbound daemon directly..."
-exec /usr/sbin/unbound -c "${UNBOUND_CONFIG_DIR}/unbound.conf" -dv
-# Note: mvance/unbound's unbound.conf includes `include-dir: /etc/unbound/unbound.conf.d`.
-# This will automatically pick up our generated config snippets.
+bashio::log.info "Unbound configuration prepared. Starting Unbound daemon..."
+# Unbound from Alpine packages typically uses /etc/unbound/unbound.conf
+# which then includes /etc/unbound/unbound.conf.d/
+exec "${UNBOUND_BIN_DIR}/unbound" -c "${UNBOUND_CONFIG_DIR}/unbound.conf" -dv
