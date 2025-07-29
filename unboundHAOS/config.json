@@ -32,7 +32,7 @@
     "verbosity": "int(0,5)",
     "access_control_ips": ["str"] # Array of strings for IP ranges
   },
-  "image": "ghcr.io/YOUR_GITHUB_USERNAME/YOUR_REPO_NAME_unbound-{arch}"
+  "image": "klutchell/unbound:{arch}"
   // NOTE: This assumes you'll build your own image. If you want to use klutchell/unbound directly:
   // "image": "klutchell/unbound:{arch}"
   // OR "image": "mvance/unbound:{arch}"
