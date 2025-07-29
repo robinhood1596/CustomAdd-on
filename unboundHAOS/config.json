@@ -1,0 +1,32 @@
+{
+  "name": "My Custom Unbound DNS",
+  "version": "1.0.0",
+  "slug": "my_custom_unbound",
+  "description": "A recursive DNS resolver running on the host network.",
+  "arch": [
+    "aarch64",
+    "amd64",
+    "armhf",
+    "armv7",
+    "i386"
+  ],
+  "startup": "services",
+  "init": false,
+  "host_network": true,
+  "ports": {
+    "53/tcp": null,
+    "53/udp": null
+  },
+  "options": {
+    "unbound_listen_port": 53,
+    "unbound_verbosity": 1,
+    "unbound_access_from": "192.168.178.0/24"
+  },
+  "schema": {
+    "unbound_listen_port": "int",
+    "unbound_verbosity": "int(0,5)",
+    "unbound_access_from": "str"
+  },
+  "image": "klutchell/unbound:{arch}"
+  // OR "image": "mvance/unbound:{arch}"
+}
