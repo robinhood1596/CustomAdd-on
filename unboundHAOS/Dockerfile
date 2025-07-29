@@ -1,8 +1,7 @@
 ARG BUILD_ARCH
 FROM mvance/unbound:latest
 
-# Install necessary tools: curl for downloading, ca-certificates for HTTPS, xz-utils for .xz decompression, and tar for archives.
-# Also add 'bash' for run.sh consistency, as it's often better than default /bin/sh.
+# Install necessary tools: curl, ca-certificates, xz-utils, tar, and bash.
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils tar bash && rm -rf /var/lib/apt/lists/*
 
 # Download and install bashio
@@ -15,7 +14,7 @@ RUN curl -sL https://github.com/home-assistant/bashio/releases/download/${BASHIO
 COPY run.sh /usr/bin/run.sh
 RUN chmod a+x /usr/bin/run.sh
 
-# Install S6-Overlay (required for Home Assistant Add-ons)
+# Install S6-Overlay (required for Home Assistant Add-ons) - More Robust Method
 ARG S6_OVERLAY_VERSION=3.1.6.2
 
 # Handle potential BUILD_ARCH to S6-Overlay arch mapping
@@ -33,27 +32,26 @@ RUN S6_ARCH="${BUILD_ARCH}"; \
     curl -sSL https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${S6_ARCH}.tar.xz \
     -o /tmp/s6-overlay-arch.tar.xz; \
     \
-    echo "Extracting S6-Overlay..."; \
-    tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz \
-    && tar -C / -Jxpf /tmp/s6-overlay-arch.tar.xz; \
+    echo "Extracting S6-Overlay to /usr/local/s6-overlay..."; \
+    mkdir -p /usr/local/s6-overlay; \
+    tar -C /usr/local/s6-overlay -Jxpf /tmp/s6-overlay-noarch.tar.xz \
+    && tar -C /usr/local/s6-overlay -Jxpf /tmp/s6-overlay-arch.tar.xz; \
+    \
+    echo "Creating symbolic links for S6-Overlay in /usr/bin..."; \
+    ln -s /usr/local/s6-overlay/bin/s6-overlay-init /usr/bin/init; \
+    ln -s /usr/local/s6-overlay/bin/s6-overlay-suexec /usr/bin/s6-overlay-suexec; \
+    ln -s /usr/local/s6-overlay/bin/s6-setuidgid /usr/bin/s6-setuidgid; \
+    # You might need to add more symlinks if other S6 tools are not found.
+    # For now, let's just make sure the essential init and suexec are there.
     \
     echo "Cleaning up S6-Overlay downloads..."; \
     rm /tmp/s6-overlay-noarch.tar.xz /tmp/s6-overlay-arch.tar.xz
 
-# Set the ENTRYPOINT to S6-Overlay's init system explicitly
-# The S6-Overlay's `/init` usually is a symlink or small script that invokes the real init binary,
-# which for v3.x is typically `/bin/s6-svscanctl` or similar for runit/init process management.
-# However, the most reliable way for S6-Overlay is `ENTRYPOINT ["/init"]`
-# coupled with a CMD that runs the services.
-
-# Let's add a debug to confirm if `/init` itself is missing, or if `s6-overlay-suexec` is what's missing later.
-# The error means `/init` *started* but then couldn't find a sub-binary it needed.
-
-# Let's try to set the PATH within the Dockerfile itself explicitly before ENTRYPOINT
+# Set a basic PATH (should be covered by S6 init, but as a safeguard)
 ENV PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-# Standard S6-Overlay entrypoint/cmd
-ENTRYPOINT ["/init"]
+# Set the ENTRYPOINT to S6-Overlay's init system
+ENTRYPOINT ["/usr/bin/init"] # Explicitly use the symlink we created
 CMD ["/usr/bin/bashio", "/usr/bin/run.sh"]
 
 # Expose ports as declared in config.json
