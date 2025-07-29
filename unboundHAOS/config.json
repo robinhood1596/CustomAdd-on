@@ -23,7 +23,7 @@
     "i386"
   ],
   "options": {
-    "listen_port": 53,
+    "listen_port": 55,
     "verbosity": 1,
     "access_control_ips": ["192.168.178.0/24", "172.16.0.0/12", "10.0.0.0/8"]
   },
