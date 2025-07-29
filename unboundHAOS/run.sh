@@ -4,7 +4,7 @@
 bashio::log.info "Starting Unbound Add-on..."
 
 # --- Define Paths ---
-UNBOUND_CONFIG_DIR="/etc/unbound"          # Standard config dir within klutchell/unbound image
+UNBOUND_CONFIG_DIR="/etc/unbound"             # Standard config dir within klutchell/unbound image
 UNBOUND_CONFIG_FILE="${UNBOUND_CONFIG_DIR}/unbound.conf"
 UNBOUND_ROOT_KEY_PATH="/var/lib/unbound/root.key" # Standard path for root.key in klutchell/unbound
 
@@ -13,7 +13,6 @@ UNBOUND_ROOT_KEY_PATH="/var/lib/unbound/root.key" # Standard path for root.key i
 UNBOUND_PORT=$(bashio::config 'listen_port')
 UNBOUND_VERBOSITY=$(bashio::config 'verbosity')
 # access_control_ips will be an array from config.json, we'll iterate it
-# Example: "access_control_ips": ["192.168.1.0/24", "10.0.0.0/8"]
 
 bashio::log.info "Generating Unbound configuration file: ${UNBOUND_CONFIG_FILE}"
 
@@ -33,7 +32,8 @@ server:
 EOF
 
 # Add access-control lines based on the array from config.json
-bashio::jq "${CONFIG_PATH}" '.access_control_ips[] | "- access-control: " + . + " allow"' \
+# REVISED LINE HERE: Pipe the config directly to jq instead of using CONFIG_PATH
+bashio::config | bashio::jq '.access_control_ips[] | "- access-control: " + . + " allow"' \
 | while read -r line; do
     echo "    ${line}" >> "${UNBOUND_CONFIG_FILE}"
 done
