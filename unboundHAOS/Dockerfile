@@ -1,33 +1,58 @@
-# Use mvance/unbound as the base image, it already contains Unbound and a shell.
-# We still need BUILD_ARCH because it's required by S6-Overlay download later.
+# Stage 0: Extract Unbound binaries and essential files from mvance/unbound
+FROM mvance/unbound:latest AS unbound_source
+
+# Stage 1: Build Environment - A robust Alpine image for building and preparing
+FROM alpine:latest AS build_env
+
+# Ensure bash is present for later script execution if needed, and curl/tar for downloads
+RUN apk add --no-cache curl bash tar xz
+
+# --- Download/Extract S6-Overlay ---
 ARG BUILD_ARCH
-# *** CRITICAL CHANGE HERE: Use 'latest' instead of '${BUILD_ARCH}' ***
-FROM mvance/unbound:latest
+ARG S6_OVERLAY_VERSION=3.1.6.2
+RUN curl -sSL https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${BUILD_ARCH}.tar.xz \
+    -o /tmp/s6-overlay.tar.xz \
+    && mkdir -p /s6-overlay \
+    && tar -C /s6-overlay -Jxpf /tmp/s6-overlay.tar.xz \
+    && rm /tmp/s6-overlay.tar.xz
 
-# Install necessary tools for this stage (curl) if not present in mvance/unbound
-# mvance/unbound is Alpine-based, so apk add is correct.
-# bash is typically already in mvance/unbound, but let's ensure curl.
-RUN apk add --no-cache curl
-
-# Download and install bashio
+# --- Download/Extract bashio ---
 ARG BASHIO_VERSION=2024.08.0
 RUN curl -sL https://github.com/home-assistant/bashio/releases/download/${BASHIO_VERSION}/bashio \
     -o /usr/bin/bashio \
     && chmod a+x /usr/bin/bashio
 
-# Copy your run.sh script into the container and make it executable
+# --- Copy your run.sh script and make it executable ---
 COPY run.sh /usr/bin/run.sh
 RUN chmod a+x /usr/bin/run.sh
 
-# Set the correct S6-Overlay ENTRYPOINT for Home Assistant Add-ons
-# mvance/unbound does *not* come with s6-overlay, so we need to add it.
-ARG S6_OVERLAY_VERSION=3.1.6.2
-RUN curl -sSL https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${BUILD_ARCH}.tar.xz \
-    -o /tmp/s6-overlay.tar.xz \
-    && tar -C / -Jxpf /tmp/s6-overlay.tar.xz \
-    && rm /tmp/s6-overlay.tar.xz
 
-# Set the ENTRYPOINT to S6-Overlay's init system
+# Stage 2: Final Add-on Image - A clean Alpine base with all components
+FROM alpine:latest
+
+# --- Copy S6-Overlay files from build_env ---
+COPY --from=build_env /s6-overlay /
+
+# --- Copy bashio from build_env ---
+COPY --from=build_env /usr/bin/bashio /usr/bin/bashio
+
+# --- Copy Unbound binaries and essential files from unbound_source ---
+# This assumes the locations within mvance/unbound:latest
+COPY --from=unbound_source /usr/sbin/unbound /usr/sbin/unbound
+COPY --from=unbound_source /usr/sbin/unbound-anchor /usr/sbin/unbound-anchor
+# Copy any default configuration files or hints from mvance/unbound
+COPY --from=unbound_source /etc/unbound /etc/unbound # Copies the whole default /etc/unbound
+
+# Ensure the copied binaries are executable (might already be, but safe to repeat)
+RUN chmod a+x /usr/sbin/unbound /usr/sbin/unbound-anchor
+
+# --- Copy the prepared run.sh from build_env ---
+COPY --from=build_env /usr/bin/run.sh /usr/bin/run.sh
+
+# Ensure necessary runtime directories exist for Unbound (if not covered by /etc/unbound copy)
+RUN mkdir -p /var/lib/unbound
+
+# Set the correct S6-Overlay ENTRYPOINT for Home Assistant Add-ons
 ENTRYPOINT ["/init"]
 CMD ["/usr/bin/bashio", "/usr/bin/run.sh"]
 
